@@ -136,3 +136,7 @@ To understand the code:
 ## Responsible use
 
 Download only videos with the right to keep them, for personal offline viewing. Respect the creators and YouTube's Terms of Service.
+
+## License
+
+Released under the [MIT License](LICENSE). The tool is free to use, change, and share, as long as the copyright notice with the author credit (sahaarijit) stays in every copy.
