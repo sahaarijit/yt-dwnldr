@@ -3,7 +3,7 @@ name = "yt-dwnldr"
 version = "1.0.0"
 description = "Download YouTube videos and playlists as mp4 files"
 authors = [
-    { name = "Arijit" }
+    { name = "sahaarijit" }
 ]
 license = "MIT"
 license-files = ["LICENSE"]
