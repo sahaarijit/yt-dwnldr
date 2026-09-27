@@ -1,0 +1,25 @@
+[project]
+name = "yt-dwnldr"
+version = "1.0.0"
+description = "Download YouTube videos and playlists as mp4 files"
+authors = [
+    { name = "Arijit" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "imageio-ffmpeg>=0.6.0",
+    "rich>=15.0.0",
+    "yt-dlp[default,deno]>=2026.8.19",
+]
+
+[project.scripts]
+yt-dwnldr = "yt_dwnldr.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.12.19,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
