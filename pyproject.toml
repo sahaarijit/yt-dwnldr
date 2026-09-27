@@ -5,6 +5,8 @@ description = "Download YouTube videos and playlists as mp4 files"
 authors = [
     { name = "Arijit" }
 ]
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.13"
 dependencies = [
     "imageio-ffmpeg>=0.6.0",
