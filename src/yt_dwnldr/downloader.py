@@ -15,6 +15,7 @@ from yt_dwnldr.ytdl import base_options
 
 FORMAT = "bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[height<=1080][ext=mp4]/bv*[height<=1080]+ba/b"
 MERGE_FORMAT = "mp4"
+CONVERTER = "FFmpegVideoConvertor"
 NO_VIDEO_CODEC = "none"
 MERGER = "Merger"
 PAUSE_MIN_SECONDS = 3
@@ -30,7 +31,7 @@ STAGE_RETRYING = "retrying"
 
 @dataclass(frozen=True)
 class ProgressEvent:
-    video_id: str
+    video_key: str
     stage: str
     done_bytes: int
     total_bytes: int | None
@@ -42,9 +43,9 @@ def stage_of(format_info: dict) -> str:
     return STAGE_AUDIO if format_info.get("vcodec") == NO_VIDEO_CODEC else STAGE_VIDEO
 
 
-def event_from_hook(video_id: str, hook: dict) -> ProgressEvent:
+def event_from_hook(video_key: str, hook: dict) -> ProgressEvent:
     return ProgressEvent(
-        video_id=video_id,
+        video_key=video_key,
         stage=stage_of(hook["info_dict"]),
         done_bytes=hook.get("downloaded_bytes", 0),
         total_bytes=hook.get("total_bytes") or hook.get("total_bytes_estimate"),
@@ -80,12 +81,12 @@ class Downloader:
         self._cookie_store = cookie_store
         self._on_progress = on_progress
         self._stop = stop
-        self._video_id = ""
+        self._video_key = ""
         self._cookies = cookie_store.latest()
         self._ydl = self._build_ydl()
 
     def download(self, video: Video) -> Path:
-        self._video_id = video.video_id
+        self._video_key = video.key
         self._use(self._cookie_store.latest())
         return run_with_retries(
             attempt=lambda: self._download_once(video),
@@ -101,7 +102,7 @@ class Downloader:
         return Path(info["requested_downloads"][0]["filepath"])
 
     def _prepare_retry(self) -> None:
-        self._on_progress(ProgressEvent(self._video_id, STAGE_RETRYING, 0, None, None, None))
+        self._on_progress(ProgressEvent(self._video_key, STAGE_RETRYING, 0, None, None, None))
         self._stop.wait(RETRY_DELAY_SECONDS)
         self._use(self._cookie_store.renew(self._cookies.version))
 
@@ -116,6 +117,8 @@ class Downloader:
         return YoutubeDL(base_options(self._cookies.text) | output_options(self._out_dir) | {
             "format": FORMAT,
             "merge_output_format": MERGE_FORMAT,
+            # Some sites offer no mp4. Those files are re-encoded into mp4, and files already in mp4 are left alone.
+            "postprocessors": [{"key": CONVERTER, "preferedformat": MERGE_FORMAT}],
             "ffmpeg_location": imageio_ffmpeg.get_ffmpeg_exe(),
             "progress_hooks": [self._on_download_hook],
             "postprocessor_hooks": [self._on_postprocess_hook],
@@ -126,8 +129,8 @@ class Downloader:
         if self._stop.is_set():
             raise DownloadCancelled("Stopped by user")
         if hook["status"] == "downloading":
-            self._on_progress(event_from_hook(self._video_id, hook))
+            self._on_progress(event_from_hook(self._video_key, hook))
 
     def _on_postprocess_hook(self, hook: dict) -> None:
         if hook["postprocessor"] == MERGER and hook["status"] == "started":
-            self._on_progress(ProgressEvent(self._video_id, STAGE_MERGING, 0, None, None, None))
+            self._on_progress(ProgressEvent(self._video_key, STAGE_MERGING, 0, None, None, None))

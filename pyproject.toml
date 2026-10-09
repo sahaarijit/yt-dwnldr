@@ -1,7 +1,7 @@
 [project]
 name = "yt-dwnldr"
-version = "1.0.0"
-description = "Download YouTube videos and playlists as mp4 files"
+version = "1.1.0"
+description = "Download videos and playlists from YouTube and other sites as mp4 files"
 authors = [
     { name = "sahaarijit" }
 ]
