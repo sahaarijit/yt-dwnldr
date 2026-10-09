@@ -10,7 +10,7 @@ from rich.console import Console
 from yt_dlp import YoutubeDL
 from yt_dlp.utils import DownloadError
 
-from yt_dwnldr.catalog import Batch, Video, expand, has_youtube_login
+from yt_dwnldr.catalog import Batch, Video, expand, has_youtube_login, is_youtube_link
 from yt_dwnldr.cookie_store import CookieStore
 from yt_dwnldr.downloader import Downloader
 from yt_dwnldr.layout import file_paths, place_copy
@@ -66,7 +66,7 @@ def worker_count(value: str) -> int:
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(prog="yt-dwnldr", description="Download YouTube videos and playlists as mp4 files.")
+    parser = argparse.ArgumentParser(prog="yt-dwnldr", description="Download videos and playlists from YouTube and other sites as mp4 files.")
     parser.add_argument("links_file", type=Path, help="text file of links, separated by commas or new lines")
     parser.add_argument("--workers", type=worker_count, default=DEFAULT_WORKERS, help="videos to download at once (1 to 8)")
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT, help="folder to save into")
@@ -74,9 +74,9 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def open_cookie_store(chrome_profile: str | None, console: Console) -> CookieStore:
+def open_cookie_store(chrome_profile: str | None, has_youtube_links: bool, console: Console) -> CookieStore:
     cookie_jar = read_chrome_cookies(chrome_profile)
-    if not has_youtube_login(cookie_jar):
+    if has_youtube_links and not has_youtube_login(cookie_jar):
         print_login_warning(console)
     return CookieStore(
         read_cookies=lambda: cookie_text(read_chrome_cookies(chrome_profile)),
@@ -89,25 +89,30 @@ def read_batches(links: list[str], cookies: str, console: Console) -> list[Batch
         return [expand(ydl, link) for link in links]
 
 
+# A failed conversion can leave an empty file behind, and an empty file is not a finished download.
+def is_saved(path: Path) -> bool:
+    return path.exists() and path.stat().st_size > 0
+
+
 # A video can sit in several playlists. It downloads once, and every other playlist folder gets a copy.
 def plan_downloads(batches: list[Batch], paths: dict[Video, Path]) -> Plan:
     plan = Plan()
     same_video: dict[str, list[Video]] = {}
     for video in (video for batch in batches for video in batch.videos):
-        same_video.setdefault(video.video_id, []).append(video)
+        same_video.setdefault(video.key, []).append(video)
 
     for videos in same_video.values():
         if not videos[0].is_available:
             plan.unavailable.extend(videos)
             continue
-        saved = [video for video in videos if paths[video].exists()]
-        missing = [video for video in videos if not paths[video].exists()]
+        saved = [video for video in videos if is_saved(paths[video])]
+        missing = [video for video in videos if not is_saved(paths[video])]
         plan.skipped.extend(saved)
         if saved:
             plan.copies_now.extend((paths[saved[0]], video) for video in missing)
         elif missing:
             plan.downloads.append(missing[0])
-            plan.copies_after_download[missing[0].video_id] = missing[1:]
+            plan.copies_after_download[missing[0].key] = missing[1:]
     return plan
 
 
@@ -136,7 +141,7 @@ def download_round(
                 screen.failed(video, error_reason(error))
             return
         screen.finished(video, path.stat().st_size)
-        for twin in copies.get(video.video_id, []):
+        for twin in copies.get(video.key, []):
             place_copy(path, paths[twin])
             screen.copied_to(twin)
         thread_state.downloader.pause()
@@ -200,7 +205,8 @@ def run(links_file: Path, workers: int, out_dir: Path, chrome_profile: str | Non
         return EXIT_BAD_INPUT
 
     out_dir.mkdir(parents=True, exist_ok=True)
-    cookie_store = open_cookie_store(chrome_profile, console)
+    has_youtube_links = any(is_youtube_link(link) for link in links)
+    cookie_store = open_cookie_store(chrome_profile, has_youtube_links, console)
     batches = read_batches(links, cookie_store.latest().text, console)
     print_batches(console, batches)
 

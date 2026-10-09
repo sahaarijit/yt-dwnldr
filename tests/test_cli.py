@@ -20,8 +20,8 @@ def test_worker_count_rejects_outside_range(value):
         worker_count(value)
 
 
-def video(video_id, folder="f", prefix="", title="t"):
-    return Video(video_id=video_id, title=title, folder=folder, prefix=prefix)
+def video(video_id, folder="f", prefix="", title="t", site="Youtube"):
+    return Video(video_id=video_id, site=site, url=f"https://example.com/{video_id}", title=title, folder=folder, prefix=prefix)
 
 
 def paths_for(tmp_path, videos, saved=()):
@@ -49,7 +49,7 @@ def test_plan_downloads_a_shared_video_once_and_copies_it_later(tmp_path):
     batches = [Batch("p1", "HLD", [in_first], True), Batch("p2", "Micro", [in_second], True)]
     plan = plan_downloads(batches, paths_for(tmp_path, [in_first, in_second]))
     assert plan.downloads == [in_first]
-    assert plan.copies_after_download == {"a": [in_second]}
+    assert plan.copies_after_download == {in_first.key: [in_second]}
 
 
 def test_plan_copies_a_shared_video_right_away_when_one_copy_is_saved(tmp_path):
@@ -59,6 +59,12 @@ def test_plan_copies_a_shared_video_right_away_when_one_copy_is_saved(tmp_path):
     plan = plan_downloads(batches, paths)
     assert plan.downloads == []
     assert plan.copies_now == [(paths[in_first], in_second)]
+
+
+def test_plan_downloads_same_id_from_two_sites_separately(tmp_path):
+    on_youtube, on_vimeo = video("a", site="Youtube"), video("a", folder="g", site="Vimeo")
+    plan = plan_downloads([Batch("p", "P", [on_youtube, on_vimeo], True)], paths_for(tmp_path, [on_youtube, on_vimeo]))
+    assert plan.downloads == [on_youtube, on_vimeo]
 
 
 def test_plan_marks_videos_without_a_title_as_unavailable(tmp_path):
@@ -130,3 +136,11 @@ def test_retry_rounds_stop_after_the_limit(monkeypatch):
     outcome, queues_seen, _ = run_rounds(monkeypatch, always_fails, [stuck])
     assert len(queues_seen) == cli.RETRY_ROUNDS + 1
     assert outcome.failures == [(stuck, "stale login")]
+
+
+def test_plan_downloads_again_when_the_saved_file_is_empty(tmp_path):
+    broken = video("a")
+    paths = paths_for(tmp_path, [broken], saved=[broken])
+    paths[broken].write_bytes(b"")
+    plan = plan_downloads([Batch("p", "P", [broken], True)], paths)
+    assert (plan.downloads, plan.skipped) == ([broken], [])
