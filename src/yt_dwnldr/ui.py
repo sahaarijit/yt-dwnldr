@@ -162,11 +162,11 @@ class Screen:
 
     def started(self, video: Video) -> None:
         with self._lock:
-            self._tasks[video.video_id] = self._bars.add_task(video.name, total=None, detail="starting")
+            self._tasks[video.key] = self._bars.add_task(video.name, total=None, detail="starting")
             self._refresh_overall()
 
     def progress(self, event: ProgressEvent) -> None:
-        task_id = self._tasks[event.video_id]
+        task_id = self._tasks[event.video_key]
         if event.stage == STAGE_MERGING:
             self._bars.update(task_id, total=MERGE_TOTAL, completed=MERGE_TOTAL, detail=detail_text(event))
             return
@@ -191,7 +191,7 @@ class Screen:
         self._console.print(copied_line(video))
 
     def _end(self, video: Video) -> None:
-        self._bars.remove_task(self._tasks.pop(video.video_id))
+        self._bars.remove_task(self._tasks.pop(video.key))
         self._finished += 1
         self._refresh_overall()
 

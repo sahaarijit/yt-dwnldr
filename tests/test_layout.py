@@ -3,7 +3,7 @@ from yt_dwnldr.layout import file_paths, place_copy
 
 
 def test_playlist_video_path_has_folder_and_number(tmp_path):
-    video = Video(video_id="abc", title="Intro: Part 1/2", folder="Low Level Design", prefix="001 - ")
+    video = Video(video_id="abc", site="Youtube", url="u", title="Intro: Part 1/2", folder="Low Level Design", prefix="001 - ")
     path = file_paths([video], tmp_path)[video]
     assert path.parent == tmp_path / "Low Level Design"
     assert path.name.startswith("001 - Intro")
@@ -12,7 +12,7 @@ def test_playlist_video_path_has_folder_and_number(tmp_path):
 
 
 def test_single_video_path_has_no_number(tmp_path):
-    video = Video(video_id="abc", title="Talk", folder="singles", prefix="")
+    video = Video(video_id="abc", site="Instagram", url="u", title="Talk", folder="singles", prefix="")
     assert file_paths([video], tmp_path)[video] == tmp_path / "singles" / "Talk.mp4"
 
 
